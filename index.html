@@ -1,1012 +1,136 @@
 <!doctype html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Pixel Reveal Demo</title>
-  <style>
-    :root {
-      --header-height: 64px;
-      --bg: #0f172a;
-      --panel: rgba(15, 23, 42, 0.88);
-      --panel-strong: rgba(15, 23, 42, 0.96);
-      --border: rgba(148, 163, 184, 0.28);
-      --text: #e2e8f0;
-      --muted: #94a3b8;
-      --accent: #38bdf8;
-      --accent-2: #22c55e;
-      --danger: #ef4444;
-      --shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
-      --radius: 18px;
-      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      color-scheme: dark;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    html, body {
-      margin: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background:
-        radial-gradient(circle at top, rgba(56, 189, 248, 0.10), transparent 30%),
-        linear-gradient(180deg, #020617 0%, #0b1120 100%);
-      color: var(--text);
-    }
-
-    body {
-      display: flex;
-      flex-direction: column;
-    }
-
-    header {
-      height: var(--header-height);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 12px 18px;
-      background: rgba(2, 6, 23, 0.86);
-      backdrop-filter: blur(14px);
-      border-bottom: 1px solid var(--border);
-      z-index: 20;
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      min-width: 0;
-    }
-
-    .brand-badge {
-      width: 36px;
-      height: 36px;
-      display: grid;
-      place-items: center;
-      border-radius: 12px;
-      background: linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(34, 197, 94, 0.18));
-      border: 1px solid rgba(56, 189, 248, 0.32);
-      font-weight: 700;
-      color: white;
-      flex: 0 0 auto;
-    }
-
-    .brand-text {
-      min-width: 0;
-    }
-
-    .brand-text strong {
-      display: block;
-      font-size: 0.98rem;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .brand-text span {
-      display: block;
-      font-size: 0.82rem;
-      color: var(--muted);
-    }
-
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-    }
-
-    button {
-      appearance: none;
-      border: 1px solid rgba(148, 163, 184, 0.25);
-      background: rgba(30, 41, 59, 0.86);
-      color: var(--text);
-      border-radius: 12px;
-      padding: 10px 14px;
-      font-size: 0.95rem;
-      cursor: pointer;
-      transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
-    }
-
-    button:hover {
-      transform: translateY(-1px);
-      border-color: rgba(56, 189, 248, 0.55);
-      background: rgba(51, 65, 85, 0.95);
-    }
-
-    button:active {
-      transform: translateY(0);
-    }
-
-    .primary {
-      background: linear-gradient(135deg, rgba(56, 189, 248, 0.24), rgba(34, 197, 94, 0.20));
-      border-color: rgba(56, 189, 248, 0.48);
-    }
-
-    .danger {
-      border-color: rgba(239, 68, 68, 0.42);
-    }
-
-    main {
-      position: relative;
-      flex: 1;
-      min-height: 0;
-      padding: 16px;
-    }
-
-    .viewer {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      border-radius: 24px;
-      background:
-        linear-gradient(180deg, rgba(15, 23, 42, 0.88), rgba(15, 23, 42, 0.72)),
-        radial-gradient(circle at 30% 20%, rgba(56, 189, 248, 0.08), transparent 25%);
-      border: 1px solid var(--border);
-      box-shadow: var(--shadow);
-      overflow: hidden;
-      touch-action: none;
-    }
-
-    .viewer::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(148, 163, 184, 0.045) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(148, 163, 184, 0.045) 1px, transparent 1px);
-      background-size: 28px 28px;
-      pointer-events: none;
-      opacity: 0.5;
-    }
-
-    canvas {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      image-rendering: pixelated;
-      image-rendering: crisp-edges;
-      cursor: grab;
-    }
-
-    canvas.dragging {
-      cursor: grabbing;
-    }
-
-    .viewer-toolbar {
-      position: absolute;
-      left: 16px;
-      top: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      z-index: 5;
-    }
-
-    .icon-button {
-      width: 48px;
-      height: 48px;
-      padding: 0;
-      font-size: 1.4rem;
-      display: grid;
-      place-items: center;
-      background: rgba(15, 23, 42, 0.94);
-      border-radius: 14px;
-      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.24);
-    }
-
-    .viewer-status {
-      position: absolute;
-      right: 16px;
-      top: 16px;
-      z-index: 5;
-      display: grid;
-      gap: 8px;
-      min-width: 220px;
-    }
-
-    .status-card {
-      background: rgba(15, 23, 42, 0.9);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 12px 14px;
-      backdrop-filter: blur(10px);
-      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
-    }
-
-    .status-card strong {
-      display: block;
-      margin-bottom: 4px;
-      font-size: 0.95rem;
-    }
-
-    .status-card span {
-      color: var(--muted);
-      font-size: 0.85rem;
-    }
-
-    .buy-fab {
-      position: absolute;
-      right: 20px;
-      bottom: 20px;
-      z-index: 5;
-      min-width: 160px;
-      min-height: 56px;
-      border-radius: 18px;
-      box-shadow: 0 16px 32px rgba(0, 0, 0, 0.32);
-      font-weight: 700;
-      background: linear-gradient(135deg, rgba(56, 189, 248, 0.28), rgba(34, 197, 94, 0.26));
-      border-color: rgba(56, 189, 248, 0.6);
-    }
-
-    .overlay {
-      position: fixed;
-      inset: 0;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
-      background: rgba(2, 6, 23, 0.62);
-      backdrop-filter: blur(10px);
-      z-index: 100;
-    }
-
-    .overlay.open {
-      display: flex;
-    }
-
-    .modal {
-      width: min(720px, 100%);
-      max-height: min(84vh, 860px);
-      overflow: auto;
-      background: var(--panel-strong);
-      border: 1px solid var(--border);
-      border-radius: 24px;
-      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
-    }
-
-    .modal-header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 16px;
-      padding: 22px 22px 10px;
-    }
-
-    .modal-header h2 {
-      margin: 0;
-      font-size: 1.35rem;
-    }
-
-    .modal-header p {
-      margin: 8px 0 0;
-      color: var(--muted);
-      line-height: 1.45;
-    }
-
-    .modal-content {
-      padding: 0 22px 22px;
-      line-height: 1.55;
-    }
-
-    .modal-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 14px;
-      margin-top: 18px;
-    }
-
-    .tile {
-      background: rgba(15, 23, 42, 0.8);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 16px;
-    }
-
-    .tile strong {
-      display: block;
-      font-size: 1.2rem;
-      margin-bottom: 6px;
-    }
-
-    .tile span {
-      color: var(--muted);
-      font-size: 0.92rem;
-    }
-
-    .form-group {
-      display: grid;
-      gap: 8px;
-      margin-top: 18px;
-    }
-
-    label {
-      font-weight: 600;
-    }
-
-    input[type="number"] {
-      width: 100%;
-      border: 1px solid rgba(148, 163, 184, 0.28);
-      background: rgba(15, 23, 42, 0.9);
-      color: var(--text);
-      border-radius: 14px;
-      padding: 14px 16px;
-      font-size: 1rem;
-      outline: none;
-    }
-
-    input[type="number"]:focus {
-      border-color: rgba(56, 189, 248, 0.62);
-      box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.12);
-    }
-
-    .helper {
-      color: var(--muted);
-      font-size: 0.9rem;
-      margin-top: 8px;
-    }
-
-    .modal-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-      margin-top: 22px;
-      flex-wrap: wrap;
-    }
-
-    .toast {
-      position: fixed;
-      left: 50%;
-      bottom: 18px;
-      transform: translateX(-50%) translateY(24px);
-      background: rgba(15, 23, 42, 0.96);
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 12px 16px;
-      border-radius: 14px;
-      box-shadow: var(--shadow);
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.18s ease, transform 0.18s ease;
-      z-index: 120;
-    }
-
-    .toast.show {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
-
-    @media (max-width: 800px) {
-      header {
-        height: auto;
-        min-height: var(--header-height);
-        align-items: flex-start;
-        padding-top: 14px;
-        padding-bottom: 14px;
-        flex-direction: column;
-      }
-
-      .header-actions {
-        width: 100%;
-        justify-content: flex-start;
-      }
-
-      main {
-        padding: 10px;
-      }
-
-      .viewer-status {
-        right: 12px;
-        top: 12px;
-        min-width: 180px;
-      }
-
-      .buy-fab {
-        right: 14px;
-        bottom: 14px;
-      }
-
-      .modal-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header>
+  <header class="app-header">
     <div class="brand">
       <div class="brand-badge">PX</div>
-      <div class="brand-text">
-        <strong>Pixel Reveal Demo</strong>
-        <span>1000 × 1000 Pixel, GitHub Pages geeignet</span>
+      <div>
+        <h1>Pixel Reveal</h1>
+        <p>1000 x 1000 Pixel Demo</p>
       </div>
     </div>
 
-    <div class="header-actions">
-      <button data-modal-open="info-modal">Info</button>
-      <button data-modal-open="stats-modal">Statistik</button>
-      <button id="fit-view-btn">Ansicht zentrieren</button>
-      <button id="reset-demo-btn" class="danger">Demo zurücksetzen</button>
-    </div>
+    <nav class="header-actions">
+      <button type="button" class="header-btn" data-open-modal="info-modal">Info</button>
+      <button type="button" class="header-btn" data-open-modal="stats-modal">Statistik</button>
+      <button type="button" class="header-btn" id="fit-view-btn">Ansicht zentrieren</button>
+      <button type="button" class="header-btn danger" id="reset-btn">Demo zurücksetzen</button>
+    </nav>
   </header>
 
-  <main>
+  <main class="app-main">
     <section class="viewer" id="viewer">
       <canvas id="pixel-canvas" width="1000" height="1000" aria-label="Pixel Canvas"></canvas>
 
       <div class="viewer-toolbar">
-        <button class="icon-button" id="zoom-in-btn" aria-label="Hineinzoomen">+</button>
-        <button class="icon-button" id="zoom-out-btn" aria-label="Herauszoomen">−</button>
+        <button type="button" class="tool-btn" id="zoom-in-btn" aria-label="Hineinzoomen">+</button>
+        <button type="button" class="tool-btn" id="zoom-out-btn" aria-label="Herauszoomen">-</button>
       </div>
 
-      <div class="viewer-status">
-        <div class="status-card">
+      <div class="viewer-cards">
+        <div class="viewer-card">
           <strong id="sold-counter">0 / 1.000.000 verkauft</strong>
           <span id="progress-text">0,0000 % sichtbar</span>
         </div>
-        <div class="status-card">
-          <strong id="zoom-level">Zoom 100 %</strong>
+        <div class="viewer-card">
+          <strong id="zoom-text">Zoom 100 %</strong>
           <span>Ziehen zum Verschieben, Mausrad zum Zoomen</span>
         </div>
       </div>
 
-      <button class="buy-fab" id="open-buy-btn">Pixel kaufen</button>
+      <button type="button" class="buy-button" id="buy-button">Pixel kaufen</button>
     </section>
   </main>
 
-  <div class="overlay" id="info-modal" aria-hidden="true">
+  <section class="modal-backdrop" id="info-modal" aria-hidden="true">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="info-title">
       <div class="modal-header">
         <div>
-          <h2 id="info-title">So funktioniert die Demo</h2>
-          <p>
-            Jeder Kauf deckt zufällig noch nicht verkaufte Pixel auf. Ein gekauftes Pixel wechselt von Weiß zu
-            dem entsprechenden Pixel aus <code>testbild.jpg</code>.
-          </p>
+          <h2 id="info-title">Über diese Demo</h2>
+          <p>Freie Pixel bleiben weiß. Verkaufte Pixel zeigen den passenden Bildpunkt aus <code>testbild.jpg</code>.</p>
         </div>
-        <button data-modal-close>Schließen</button>
+        <button type="button" class="header-btn" data-close-modal>Schließen</button>
       </div>
-      <div class="modal-content">
-        <div class="modal-grid">
-          <div class="tile">
-            <strong>GitHub Pages Start</strong>
-            <span>Die Speicherung erfolgt hier lokal im Browser per IndexedDB. Das ist für einen ersten Prototyp ideal.</span>
-          </div>
-          <div class="tile">
-            <strong>Später mit Server</strong>
-            <span>Für echte Käufe, gemeinsame Zustände und Zahlungsbestätigungen kann später eine API ergänzt werden.</span>
-          </div>
-          <div class="tile">
-            <strong>Zufällige Auswahl</strong>
-            <span>Die Pixel werden nicht manuell ausgewählt, sondern automatisch zufällig aus den freien Pixeln gezogen.</span>
-          </div>
-          <div class="tile">
-            <strong>Performant</strong>
-            <span>Das Canvas rendert nur ein Bild und nutzt eine kompakte Bitmaske für den Verkaufsstatus.</span>
-          </div>
-        </div>
+      <div class="modal-content two-col">
+        <article class="info-box">
+          <h3>GitHub Pages</h3>
+          <p>Diese Version speichert den Zustand lokal im Browser mit IndexedDB.</p>
+        </article>
+        <article class="info-box">
+          <h3>Späterer Server</h3>
+          <p>Ein echtes Backend kann später dieselbe Oberfläche weiterverwenden.</p>
+        </article>
+        <article class="info-box">
+          <h3>Zufälliger Kauf</h3>
+          <p>Die Pixel werden nicht manuell gewählt, sondern zufällig aus freien Pixeln gezogen.</p>
+        </article>
+        <article class="info-box">
+          <h3>Bildgröße</h3>
+          <p>Das Bild sollte 1000 x 1000 Pixel groß sein und als <code>testbild.jpg</code> im selben Ordner liegen.</p>
+        </article>
       </div>
     </div>
-  </div>
+  </section>
 
-  <div class="overlay" id="stats-modal" aria-hidden="true">
+  <section class="modal-backdrop" id="stats-modal" aria-hidden="true">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="stats-title">
       <div class="modal-header">
         <div>
-          <h2 id="stats-title">Aktueller Stand</h2>
-          <p>Diese Werte werden aus dem lokalen Demo-Status berechnet.</p>
+          <h2 id="stats-title">Statistik</h2>
+          <p>Aktuelle Werte des lokalen Demo-Standes.</p>
         </div>
-        <button data-modal-close>Schließen</button>
+        <button type="button" class="header-btn" data-close-modal>Schließen</button>
       </div>
-      <div class="modal-content">
-        <div class="modal-grid">
-          <div class="tile">
-            <strong id="stats-sold">0</strong>
-            <span>verkaufte Pixel</span>
-          </div>
-          <div class="tile">
-            <strong id="stats-free">1.000.000</strong>
-            <span>freie Pixel</span>
-          </div>
-          <div class="tile">
-            <strong id="stats-percent">0,0000 %</strong>
-            <span>sichtbarer Anteil</span>
-          </div>
-          <div class="tile">
-            <strong id="stats-remaining">1.000.000</strong>
-            <span>noch verfügbar</span>
-          </div>
-        </div>
+      <div class="modal-content two-col">
+        <article class="info-box">
+          <h3>Verkauft</h3>
+          <p id="stats-sold">0</p>
+        </article>
+        <article class="info-box">
+          <h3>Frei</h3>
+          <p id="stats-free">1.000.000</p>
+        </article>
+        <article class="info-box">
+          <h3>Sichtbar</h3>
+          <p id="stats-visible">0,0000 %</p>
+        </article>
+        <article class="info-box">
+          <h3>Status</h3>
+          <p id="stats-status">testbild.jpg noch nicht sichtbar</p>
+        </article>
       </div>
     </div>
-  </div>
+  </section>
 
-  <div class="overlay" id="buy-modal" aria-hidden="true">
+  <section class="modal-backdrop" id="buy-modal" aria-hidden="true">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="buy-title">
       <div class="modal-header">
         <div>
           <h2 id="buy-title">Pixel kaufen</h2>
-          <p>
-            Hier wird später ein Zahlungsdienst angebunden. Im ersten Schritt simulierst du, wie viele Pixel nach einer
-            erfolgreichen Zahlung zufällig gekauft werden sollen.
-          </p>
+          <p>Hier wird später ein Zahlungsdienst eingebunden. Aktuell wird der erfolgreiche Kauf simuliert.</p>
         </div>
-        <button data-modal-close>Schließen</button>
+        <button type="button" class="header-btn" data-close-modal>Schließen</button>
       </div>
       <div class="modal-content">
-        <div class="form-group">
-          <label for="pixel-count-input">Anzahl zu kaufender Pixel</label>
-          <input id="pixel-count-input" type="number" min="1" step="1" value="100" />
-        </div>
-        <div class="helper">
-          Es werden automatisch freie Pixel zufällig ausgewählt. Bereits verkaufte Pixel werden nicht erneut verwendet.
-        </div>
+        <label class="field-label" for="pixel-count-input">Anzahl der Pixel</label>
+        <input id="pixel-count-input" class="field-input" type="number" min="1" step="1" value="100">
+        <p class="field-hint">Es werden automatisch freie Pixel zufällig ausgewählt.</p>
         <div class="modal-actions">
-          <button data-modal-close>Abbrechen</button>
-          <button id="confirm-buy-btn" class="primary">Kauf simulieren</button>
+          <button type="button" class="header-btn" data-close-modal>Abbrechen</button>
+          <button type="button" class="header-btn primary" id="confirm-buy-btn">Kauf simulieren</button>
         </div>
       </div>
     </div>
-  </div>
+  </section>
 
-  <div class="toast" id="toast"></div>
+  <div class="toast" id="toast" aria-live="polite"></div>
 
-  <script>
-    const GRID_WIDTH = 1000;
-    const GRID_HEIGHT = 1000;
-    const TOTAL_PIXELS = GRID_WIDTH * GRID_HEIGHT;
-    const MIN_ZOOM = 0.5;
-    const MAX_ZOOM = 40;
-    const ZOOM_STEP = 1.15;
-    const DB_NAME = 'pixelRevealDemoDB';
-    const STORE_NAME = 'appState';
-    const STATE_KEY = 'main';
-
-    const canvas = document.getElementById('pixel-canvas');
-    const ctx = canvas.getContext('2d', { alpha: false });
-    const viewer = document.getElementById('viewer');
-
-    const soldCounterEl = document.getElementById('sold-counter');
-    const progressTextEl = document.getElementById('progress-text');
-    const zoomLevelEl = document.getElementById('zoom-level');
-    const statsSoldEl = document.getElementById('stats-sold');
-    const statsFreeEl = document.getElementById('stats-free');
-    const statsPercentEl = document.getElementById('stats-percent');
-    const statsRemainingEl = document.getElementById('stats-remaining');
-    const pixelCountInput = document.getElementById('pixel-count-input');
-    const toast = document.getElementById('toast');
-
-    const offscreenCanvas = document.createElement('canvas');
-    offscreenCanvas.width = GRID_WIDTH;
-    offscreenCanvas.height = GRID_HEIGHT;
-    const offscreenCtx = offscreenCanvas.getContext('2d', { alpha: false, willReadFrequently: true });
-
-    const sourceCanvas = document.createElement('canvas');
-    sourceCanvas.width = GRID_WIDTH;
-    sourceCanvas.height = GRID_HEIGHT;
-    const sourceCtx = sourceCanvas.getContext('2d', { alpha: false, willReadFrequently: true });
-
-    let sourceImageData = null;
-    let state = {
-      soldCount: 0,
-      bits: new Uint8Array(Math.ceil(TOTAL_PIXELS / 8))
-    };
-
-    let db = null;
-    let needsRender = true;
-    let isReady = false;
-
-    const view = {
-      zoom: 1,
-      offsetX: 0,
-      offsetY: 0,
-      dragging: false,
-      lastX: 0,
-      lastY: 0
-    };
-
-    function formatNumber(value) {
-      return new Intl.NumberFormat('de-DE').format(value);
-    }
-
-    function formatPercent(value) {
-      return new Intl.NumberFormat('de-DE', {
-        minimumFractionDigits: 4,
-        maximumFractionDigits: 4
-      }).format(value);
-    }
-
-    function showToast(message) {
-      toast.textContent = message;
-      toast.classList.add('show');
-      clearTimeout(showToast._timer);
-      showToast._timer = setTimeout(() => toast.classList.remove('show'), 2200);
-    }
-
-    function openModal(id) {
-      document.getElementById(id)?.classList.add('open');
-      document.getElementById(id)?.setAttribute('aria-hidden', 'false');
-    }
-
-    function closeModal(modal) {
-      modal.classList.remove('open');
-      modal.setAttribute('aria-hidden', 'true');
-    }
-
-    function isSold(index) {
-      return ((state.bits[index >> 3] >> (index & 7)) & 1) === 1;
-    }
-
-    function setSold(index) {
-      state.bits[index >> 3] |= 1 << (index & 7);
-    }
-
-    function fillWhiteMask() {
-      offscreenCtx.save();
-      offscreenCtx.setTransform(1, 0, 0, 1, 0, 0);
-      offscreenCtx.clearRect(0, 0, GRID_WIDTH, GRID_HEIGHT);
-      offscreenCtx.fillStyle = '#ffffff';
-      offscreenCtx.fillRect(0, 0, GRID_WIDTH, GRID_HEIGHT);
-      offscreenCtx.restore();
-    }
-
-    function revealPixel(index) {
-      if (!sourceImageData) return;
-      const x = index % GRID_WIDTH;
-      const y = Math.floor(index / GRID_WIDTH);
-      const srcIndex = index * 4;
-      const pixel = sourceImageData.data;
-      const imageData = offscreenCtx.createImageData(1, 1);
-      imageData.data[0] = pixel[srcIndex];
-      imageData.data[1] = pixel[srcIndex + 1];
-      imageData.data[2] = pixel[srcIndex + 2];
-      imageData.data[3] = 255;
-      offscreenCtx.putImageData(imageData, x, y);
-    }
-
-    function rebuildRevealCanvasFromState() {
-      fillWhiteMask();
-      for (let i = 0; i < TOTAL_PIXELS; i++) {
-        if (isSold(i)) revealPixel(i);
-      }
-      requestRender();
-    }
-
-    function updateStats() {
-      const sold = state.soldCount;
-      const free = TOTAL_PIXELS - sold;
-      const percent = (sold / TOTAL_PIXELS) * 100;
-
-      soldCounterEl.textContent = `${formatNumber(sold)} / ${formatNumber(TOTAL_PIXELS)} verkauft`;
-      progressTextEl.textContent = `${formatPercent(percent)} % sichtbar`;
-      zoomLevelEl.textContent = `Zoom ${Math.round(view.zoom * 100)} %`;
-
-      statsSoldEl.textContent = formatNumber(sold);
-      statsFreeEl.textContent = formatNumber(free);
-      statsPercentEl.textContent = `${formatPercent(percent)} %`;
-      statsRemainingEl.textContent = formatNumber(free);
-    }
-
-    function fitToView() {
-      const rect = viewer.getBoundingClientRect();
-      const scaleX = rect.width / GRID_WIDTH;
-      const scaleY = rect.height / GRID_HEIGHT;
-      view.zoom = Math.min(scaleX, scaleY);
-      view.offsetX = (rect.width - GRID_WIDTH * view.zoom) / 2;
-      view.offsetY = (rect.height - GRID_HEIGHT * view.zoom) / 2;
-      updateStats();
-      requestRender();
-    }
-
-    function clampOffsets() {
-      const rect = viewer.getBoundingClientRect();
-      const contentWidth = GRID_WIDTH * view.zoom;
-      const contentHeight = GRID_HEIGHT * view.zoom;
-
-      if (contentWidth <= rect.width) {
-        view.offsetX = (rect.width - contentWidth) / 2;
-      }
-      if (contentHeight <= rect.height) {
-        view.offsetY = (rect.height - contentHeight) / 2;
-      }
-    }
-
-    function zoomAt(factor, clientX, clientY) {
-      const rect = viewer.getBoundingClientRect();
-      const localX = clientX - rect.left;
-      const localY = clientY - rect.top;
-      const worldX = (localX - view.offsetX) / view.zoom;
-      const worldY = (localY - view.offsetY) / view.zoom;
-
-      const nextZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, view.zoom * factor));
-      view.zoom = nextZoom;
-      view.offsetX = localX - worldX * view.zoom;
-      view.offsetY = localY - worldY * view.zoom;
-      clampOffsets();
-      updateStats();
-      requestRender();
-    }
-
-    function draw() {
-      needsRender = false;
-      const rect = viewer.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
-      const displayWidth = Math.max(1, Math.round(rect.width * dpr));
-      const displayHeight = Math.max(1, Math.round(rect.height * dpr));
-
-      if (canvas.width !== displayWidth || canvas.height !== displayHeight) {
-        canvas.width = displayWidth;
-        canvas.height = displayHeight;
-      }
-
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.imageSmoothingEnabled = false;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(0, 0, rect.width, rect.height);
-      ctx.drawImage(
-        offscreenCanvas,
-        0,
-        0,
-        GRID_WIDTH,
-        GRID_HEIGHT,
-        view.offsetX,
-        view.offsetY,
-        GRID_WIDTH * view.zoom,
-        GRID_HEIGHT * view.zoom
-      );
-    }
-
-    function requestRender() {
-      if (needsRender) return;
-      needsRender = true;
-      requestAnimationFrame(draw);
-    }
-
-    function indexedDbRequestToPromise(request) {
-      return new Promise((resolve, reject) => {
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-    }
-
-    async function openDb() {
-      return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, 1);
-
-        request.onupgradeneeded = () => {
-          const database = request.result;
-          if (!database.objectStoreNames.contains(STORE_NAME)) {
-            database.createObjectStore(STORE_NAME, { keyPath: 'id' });
-          }
-        };
-
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-    }
-
-    async function loadState() {
-      if (!db) return;
-      const transaction = db.transaction(STORE_NAME, 'readonly');
-      const store = transaction.objectStore(STORE_NAME);
-      const record = await indexedDbRequestToPromise(store.get(STATE_KEY));
-
-      if (record?.bits) {
-        state = {
-          soldCount: typeof record.soldCount === 'number' ? record.soldCount : 0,
-          bits: new Uint8Array(record.bits)
-        };
-      }
-    }
-
-    async function saveState() {
-      if (!db) return;
-      const transaction = db.transaction(STORE_NAME, 'readwrite');
-      const store = transaction.objectStore(STORE_NAME);
-      await indexedDbRequestToPromise(store.put({
-        id: STATE_KEY,
-        soldCount: state.soldCount,
-        bits: state.bits.buffer.slice(0)
-      }));
-    }
-
-    async function resetState() {
-      state = {
-        soldCount: 0,
-        bits: new Uint8Array(Math.ceil(TOTAL_PIXELS / 8))
-      };
-      fillWhiteMask();
-      updateStats();
-      requestRender();
-      await saveState();
-      showToast('Demo wurde zurückgesetzt');
-    }
-
-    function getRandomUnsoldPixel() {
-      if (state.soldCount >= TOTAL_PIXELS) return -1;
-
-      const maxAttempts = 120;
-      for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        const candidate = Math.floor(Math.random() * TOTAL_PIXELS);
-        if (!isSold(candidate)) return candidate;
-      }
-
-      for (let i = 0; i < TOTAL_PIXELS; i++) {
-        if (!isSold(i)) return i;
-      }
-
-      return -1;
-    }
-
-    async function simulatePurchase(amount) {
-      if (!Number.isFinite(amount) || amount <= 0) {
-        showToast('Bitte eine gültige Anzahl eingeben');
-        return;
-      }
-
-      const freePixels = TOTAL_PIXELS - state.soldCount;
-      if (freePixels <= 0) {
-        showToast('Alle Pixel sind bereits verkauft');
-        return;
-      }
-
-      const purchaseCount = Math.min(Math.floor(amount), freePixels);
-      let changed = 0;
-
-      for (let i = 0; i < purchaseCount; i++) {
-        const pixelIndex = getRandomUnsoldPixel();
-        if (pixelIndex === -1) break;
-        setSold(pixelIndex);
-        revealPixel(pixelIndex);
-        changed++;
-      }
-
-      if (changed > 0) {
-        state.soldCount += changed;
-        updateStats();
-        requestRender();
-        await saveState();
-        showToast(`${formatNumber(changed)} Pixel zufällig gekauft`);
-      }
-
-      if (state.soldCount >= TOTAL_PIXELS) {
-        showToast('Alle Pixel sind verkauft. Das Bild ist vollständig sichtbar.');
-      }
-    }
-
-    async function loadSourceImage() {
-      return new Promise((resolve, reject) => {
-        const image = new Image();
-        image.onload = () => {
-          sourceCtx.clearRect(0, 0, GRID_WIDTH, GRID_HEIGHT);
-          sourceCtx.drawImage(image, 0, 0, GRID_WIDTH, GRID_HEIGHT);
-          sourceImageData = sourceCtx.getImageData(0, 0, GRID_WIDTH, GRID_HEIGHT);
-          resolve();
-        };
-        image.onerror = () => reject(new Error('testbild.jpg konnte nicht geladen werden.'));
-        image.src = 'testbild.jpg';
-      });
-    }
-
-    function bindModalEvents() {
-      document.querySelectorAll('[data-modal-open]').forEach(button => {
-        button.addEventListener('click', () => openModal(button.dataset.modalOpen));
-      });
-
-      document.querySelectorAll('[data-modal-close]').forEach(button => {
-        button.addEventListener('click', () => {
-          const overlay = button.closest('.overlay');
-          if (overlay) closeModal(overlay);
-        });
-      });
-
-      document.querySelectorAll('.overlay').forEach(overlay => {
-        overlay.addEventListener('click', event => {
-          if (event.target === overlay) closeModal(overlay);
-        });
-      });
-    }
-
-    function bindViewerEvents() {
-      document.getElementById('zoom-in-btn').addEventListener('click', () => {
-        const rect = viewer.getBoundingClientRect();
-        zoomAt(ZOOM_STEP, rect.left + rect.width / 2, rect.top + rect.height / 2);
-      });
-
-      document.getElementById('zoom-out-btn').addEventListener('click', () => {
-        const rect = viewer.getBoundingClientRect();
-        zoomAt(1 / ZOOM_STEP, rect.left + rect.width / 2, rect.top + rect.height / 2);
-      });
-
-      document.getElementById('fit-view-btn').addEventListener('click', fitToView);
-      document.getElementById('open-buy-btn').addEventListener('click', () => openModal('buy-modal'));
-
-      document.getElementById('confirm-buy-btn').addEventListener('click', async () => {
-        const amount = Number(pixelCountInput.value);
-        await simulatePurchase(amount);
-        closeModal(document.getElementById('buy-modal'));
-      });
-
-      document.getElementById('reset-demo-btn').addEventListener('click', async () => {
-        const confirmed = window.confirm('Soll die Demo wirklich zurückgesetzt werden?');
-        if (!confirmed) return;
-        await resetState();
-      });
-
-      viewer.addEventListener('wheel', event => {
-        event.preventDefault();
-        const factor = event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
-        zoomAt(factor, event.clientX, event.clientY);
-      }, { passive: false });
-
-      viewer.addEventListener('pointerdown', event => {
-        if (event.button !== 0) return;
-        view.dragging = true;
-        view.lastX = event.clientX;
-        view.lastY = event.clientY;
-        canvas.classList.add('dragging');
-        viewer.setPointerCapture(event.pointerId);
-      });
-
-      viewer.addEventListener('pointermove', event => {
-        if (!view.dragging) return;
-        const dx = event.clientX - view.lastX;
-        const dy = event.clientY - view.lastY;
-        view.lastX = event.clientX;
-        view.lastY = event.clientY;
-        view.offsetX += dx;
-        view.offsetY += dy;
-        clampOffsets();
-        requestRender();
-      });
-
-      function stopDragging(event) {
-        if (!view.dragging) return;
-        view.dragging = false;
-        canvas.classList.remove('dragging');
-        if (event?.pointerId !== undefined && viewer.hasPointerCapture(event.pointerId)) {
-          viewer.releasePointerCapture(event.pointerId);
-        }
-      }
-
-      viewer.addEventListener('pointerup', stopDragging);
-      viewer.addEventListener('pointercancel', stopDragging);
-      viewer.addEventListener('pointerleave', event => {
-        if (event.pointerType === 'mouse') stopDragging(event);
-      });
-
-      window.addEventListener('resize', () => {
-        clampOffsets();
-        requestRender();
-      });
-    }
-
-    async function init() {
-      try {
-        bindModalEvents();
-        bindViewerEvents();
-        db = await openDb();
-        await loadState();
-        await loadSourceImage();
-        rebuildRevealCanvasFromState();
-        fitToView();
-        updateStats();
-        isReady = true;
-      } catch (error) {
-        console.error(error);
-        showToast(error.message || 'Beim Initialisieren ist ein Fehler aufgetreten');
-      }
-    }
-
-    init();
-  </script>
+  <script src="script.js"></script>
 </body>
 </html>
