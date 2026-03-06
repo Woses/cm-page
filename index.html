@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>One Million Pixel Homepage</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+
+<div id="navbar">
+    <h1>One Million Pixel Homepage</h1>
+    <button id="showOccupiedBtn">Gekaufte Pixel anzeigen</button>
+    <a href="about.html" id="aboutBtn" style="color: white; text-decoration: none; padding: 10px 15px; background-color: #555; border: none; border-radius: 5px;">Über uns</a>
+    <button id="contactBtn">Kontakt</button>
+    <button id="helpBtn">Hilfe</button>
+</div>
+
+    
+    <div id="pixelGrid">
+        <div id="overlay"></div> <!-- Graue Überlagerung -->
+    </div>
+    
+    <form id="buyPixelForm">
+        <button type="submit">Pixel kaufen</button>
+    </form>
+    
+    <p id="notification"></p>
+    <div id="occupiedPixelsList" style="display: none;">
+        <h2>Gekaufte Pixel</h2>
+        <table id="occupiedPixelsTable">
+            <thead>
+                <tr>
+                    <th>Pixel-Nummer</th>
+                </tr>
+            </thead>
+            <tbody id="occupiedPixelsContainer"></tbody>
+        </table>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
+
