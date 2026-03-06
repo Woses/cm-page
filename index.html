@@ -1,45 +1,823 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="de">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>One Million Pixel Homepage</title>
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pixel Canvas Prototype</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --panel: #171a21;
+      --panel-2: #1f2430;
+      --text: #eef2f7;
+      --muted: #aab4c3;
+      --accent: #4f8cff;
+      --accent-2: #7aa6ff;
+      --danger: #ff5c74;
+      --border: rgba(255,255,255,0.08);
+      --shadow: 0 12px 40px rgba(0,0,0,0.28);
+      --radius: 18px;
+      --header-h: 72px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at top, #1a2030 0%, var(--bg) 42%);
+      color: var(--text);
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow: hidden;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      height: var(--header-h);
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(15,17,21,0.8);
+      backdrop-filter: blur(14px);
+      position: relative;
+      z-index: 20;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .brand-badge {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), #7d5cff);
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      box-shadow: var(--shadow);
+    }
+
+    .brand-text {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .brand-text strong {
+      font-size: 1rem;
+      white-space: nowrap;
+    }
+
+    .brand-text span {
+      color: var(--muted);
+      font-size: 0.88rem;
+      white-space: nowrap;
+    }
+
+    .header-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    button {
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      color: var(--text);
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: transform 0.14s ease, background 0.14s ease, border-color 0.14s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(255,255,255,0.16);
+      background: #293042;
+    }
+
+    button.primary {
+      background: var(--accent);
+      border-color: transparent;
+      color: white;
+    }
+
+    button.primary:hover {
+      background: var(--accent-2);
+    }
+
+    main {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+    }
+
+    .viewer {
+      position: relative;
+      width: min(92vw, calc(100vh - var(--header-h) - 48px));
+      height: min(92vw, calc(100vh - var(--header-h) - 48px));
+      max-width: 1100px;
+      max-height: 1100px;
+      min-width: 320px;
+      min-height: 320px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .canvas-stage {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      overflow: hidden;
+      cursor: grab;
+      background:
+        linear-gradient(45deg, rgba(255,255,255,0.025) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(255,255,255,0.025) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(255,255,255,0.025) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(255,255,255,0.025) 75%);
+      background-size: 24px 24px;
+      background-position: 0 0, 0 12px, 12px -12px, -12px 0px;
+    }
+
+    .canvas-stage.dragging {
+      cursor: grabbing;
+    }
+
+    canvas {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform-origin: top left;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      background: #ffffff;
+      border: 1px solid rgba(0,0,0,0.08);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+    }
+
+    .zoom-controls {
+      position: absolute;
+      left: 14px;
+      top: 14px;
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .zoom-btn {
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      border-radius: 14px;
+      font-size: 1.2rem;
+      font-weight: 700;
+      display: grid;
+      place-items: center;
+      background: rgba(23,26,33,0.92);
+      backdrop-filter: blur(8px);
+    }
+
+    .status-bar {
+      position: absolute;
+      right: 14px;
+      bottom: 14px;
+      z-index: 5;
+      background: rgba(23,26,33,0.92);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 10px 12px;
+      font-size: 0.9rem;
+      color: var(--muted);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 210px;
+    }
+
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      background: rgba(7,10,14,0.56);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .overlay.open {
+      display: flex;
+    }
+
+    .window {
+      width: min(720px, 92vw);
+      max-height: 82vh;
+      overflow: auto;
+      background: rgba(23,26,33,0.98);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+      padding: 22px;
+    }
+
+    .window-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .window-header h2 {
+      margin: 0;
+      font-size: 1.2rem;
+    }
+
+    .window p,
+    .window li,
+    .window label,
+    .window pre,
+    .window code {
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .panel-block {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      margin-top: 14px;
+    }
+
+    .legend {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 10px 12px;
+      align-items: center;
+    }
+
+    .swatch {
+      width: 18px;
+      height: 18px;
+      border-radius: 5px;
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+
+    .swatch.free {
+      background: #ffffff;
+    }
+
+    .swatch.sold {
+      background: #4f8cff;
+    }
+
+    .toolbar-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .mini {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .danger {
+      background: rgba(255,92,116,0.12);
+      border-color: rgba(255,92,116,0.24);
+      color: #ffd7df;
+    }
+
+    .file-input {
+      display: none;
+    }
+
+    .note {
+      margin-top: 10px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(79,140,255,0.1);
+      color: #d9e6ff;
+      border: 1px solid rgba(79,140,255,0.22);
+    }
+
+    @media (max-width: 760px) {
+      header {
+        height: auto;
+        padding: 14px;
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .header-actions {
+        width: 100%;
+        justify-content: flex-start;
+      }
+
+      main {
+        padding: 14px;
+      }
+
+      .viewer {
+        width: 100%;
+        height: min(72vh, 100vw);
+      }
+    }
+  </style>
 </head>
 <body>
-
-
-<div id="navbar">
-    <h1>One Million Pixel Homepage</h1>
-    <button id="showOccupiedBtn">Gekaufte Pixel anzeigen</button>
-    <a href="about.html" id="aboutBtn" style="color: white; text-decoration: none; padding: 10px 15px; background-color: #555; border: none; border-radius: 5px;">Über uns</a>
-    <button id="contactBtn">Kontakt</button>
-    <button id="helpBtn">Hilfe</button>
-</div>
-
-    
-    <div id="pixelGrid">
-        <div id="overlay"></div> <!-- Graue Überlagerung -->
+  <header>
+    <div class="brand">
+      <div class="brand-badge">PX</div>
+      <div class="brand-text">
+        <strong>Pixel Canvas</strong>
+        <span>GitHub Pages Prototyp mit JSON-Zustand</span>
+      </div>
     </div>
-    
-    <form id="buyPixelForm">
-        <button type="submit">Pixel kaufen</button>
-    </form>
-    
-    <p id="notification"></p>
-    <div id="occupiedPixelsList" style="display: none;">
-        <h2>Gekaufte Pixel</h2>
-        <table id="occupiedPixelsTable">
-            <thead>
-                <tr>
-                    <th>Pixel-Nummer</th>
-                </tr>
-            </thead>
-            <tbody id="occupiedPixelsContainer"></tbody>
-        </table>
+
+    <div class="header-actions">
+      <button data-window="info">Info</button>
+      <button data-window="stats">Statistik</button>
+      <button data-window="storage">Speicherung</button>
+      <button class="primary" data-window="help">Hilfe</button>
     </div>
-    
-    <script src="script.js"></script>
+  </header>
+
+  <main>
+    <section class="viewer">
+      <div class="zoom-controls">
+        <button id="zoomInBtn" class="zoom-btn" aria-label="Hineinzoomen">+</button>
+        <button id="zoomOutBtn" class="zoom-btn" aria-label="Herauszoomen">−</button>
+      </div>
+
+      <div class="canvas-stage" id="canvasStage">
+        <canvas id="pixelCanvas" width="1000" height="1000"></canvas>
+      </div>
+
+      <div class="status-bar">
+        <div class="status-row"><span>Zoom</span><strong id="zoomValue">100%</strong></div>
+        <div class="status-row"><span>Koordinate</span><strong id="hoverValue">-</strong></div>
+        <div class="status-row"><span>Verkauft</span><strong id="soldValue">0</strong></div>
+      </div>
+    </section>
+
+    <div class="overlay" id="overlay">
+      <div class="window" id="windowContent"></div>
+    </div>
+  </main>
+
+  <input type="file" id="jsonImportInput" class="file-input" accept="application/json" />
+
+  <script>
+    const GRID_SIZE = 1000;
+    const STORAGE_KEY = 'pixel-canvas-state-v1';
+    const DEFAULT_PIXEL = 0;
+    const SOLD_PIXEL = 1;
+
+    const canvas = document.getElementById('pixelCanvas');
+    const ctx = canvas.getContext('2d', { alpha: false });
+    const stage = document.getElementById('canvasStage');
+    const overlay = document.getElementById('overlay');
+    const windowContent = document.getElementById('windowContent');
+    const jsonImportInput = document.getElementById('jsonImportInput');
+
+    const zoomValue = document.getElementById('zoomValue');
+    const hoverValue = document.getElementById('hoverValue');
+    const soldValue = document.getElementById('soldValue');
+
+    const state = {
+      scale: 1,
+      minScale: 0.2,
+      maxScale: 24,
+      offsetX: -GRID_SIZE / 2,
+      offsetY: -GRID_SIZE / 2,
+      isDragging: false,
+      dragStartX: 0,
+      dragStartY: 0,
+      pixels: null,
+      soldCount: 0,
+      hoveredX: null,
+      hoveredY: null,
+    };
+
+    function createInitialPixelState() {
+      return new Uint8Array(GRID_SIZE * GRID_SIZE);
+    }
+
+    function indexFromXY(x, y) {
+      return y * GRID_SIZE + x;
+    }
+
+    function getPixel(x, y) {
+      if (x < 0 || y < 0 || x >= GRID_SIZE || y >= GRID_SIZE) return DEFAULT_PIXEL;
+      return state.pixels[indexFromXY(x, y)];
+    }
+
+    function setPixel(x, y, value) {
+      if (x < 0 || y < 0 || x >= GRID_SIZE || y >= GRID_SIZE) return;
+      const index = indexFromXY(x, y);
+      const previous = state.pixels[index];
+      if (previous === value) return;
+      state.pixels[index] = value;
+
+      if (previous === SOLD_PIXEL && value !== SOLD_PIXEL) state.soldCount -= 1;
+      if (previous !== SOLD_PIXEL && value === SOLD_PIXEL) state.soldCount += 1;
+
+      drawCanvas();
+      updateStatus();
+      persistState();
+    }
+
+    function savePayload() {
+      return {
+        version: 1,
+        gridSize: GRID_SIZE,
+        soldCount: state.soldCount,
+        pixels: Array.from(state.pixels),
+      };
+    }
+
+    function persistState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(savePayload()));
+      } catch (error) {
+        console.error('Speichern fehlgeschlagen', error);
+      }
+    }
+
+    function loadPersistedState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return false;
+        const parsed = JSON.parse(raw);
+        if (!parsed || parsed.gridSize !== GRID_SIZE || !Array.isArray(parsed.pixels)) return false;
+        state.pixels = Uint8Array.from(parsed.pixels);
+        state.soldCount = Number(parsed.soldCount || 0);
+        return true;
+      } catch (error) {
+        console.warn('Geladener Zustand war ungültig', error);
+        return false;
+      }
+    }
+
+    function exportStateAsJson() {
+      const blob = new Blob([JSON.stringify(savePayload())], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'pixel-canvas-state.json';
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function importStateFromJson(file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const parsed = JSON.parse(String(reader.result));
+          if (!parsed || parsed.gridSize !== GRID_SIZE || !Array.isArray(parsed.pixels)) {
+            alert('Die JSON-Datei passt nicht zu diesem Canvas.');
+            return;
+          }
+          state.pixels = Uint8Array.from(parsed.pixels);
+          state.soldCount = state.pixels.reduce((count, value) => count + (value === SOLD_PIXEL ? 1 : 0), 0);
+          persistState();
+          drawCanvas();
+          updateStatus();
+          closeWindow();
+        } catch (error) {
+          console.error(error);
+          alert('Die JSON-Datei konnte nicht gelesen werden.');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function resetState() {
+      if (!confirm('Möchtest du wirklich alle Pixel zurücksetzen?')) return;
+      state.pixels = createInitialPixelState();
+      state.soldCount = 0;
+      persistState();
+      drawCanvas();
+      updateStatus();
+      closeWindow();
+    }
+
+    function drawCanvas() {
+      const img = ctx.createImageData(GRID_SIZE, GRID_SIZE);
+      const data = img.data;
+
+      for (let i = 0; i < state.pixels.length; i += 1) {
+        const value = state.pixels[i];
+        const offset = i * 4;
+
+        if (value === SOLD_PIXEL) {
+          data[offset] = 79;
+          data[offset + 1] = 140;
+          data[offset + 2] = 255;
+          data[offset + 3] = 255;
+        } else {
+          data[offset] = 255;
+          data[offset + 1] = 255;
+          data[offset + 2] = 255;
+          data[offset + 3] = 255;
+        }
+      }
+
+      ctx.putImageData(img, 0, 0);
+
+      if (state.scale >= 4) {
+        drawGridOverlay();
+      }
+
+      if (
+        Number.isInteger(state.hoveredX) &&
+        Number.isInteger(state.hoveredY) &&
+        state.hoveredX >= 0 &&
+        state.hoveredY >= 0 &&
+        state.hoveredX < GRID_SIZE &&
+        state.hoveredY < GRID_SIZE
+      ) {
+        ctx.save();
+        ctx.strokeStyle = '#ff5c74';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(state.hoveredX + 0.5, state.hoveredY + 0.5, 1, 1);
+        ctx.restore();
+      }
+    }
+
+    function drawGridOverlay() {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+      ctx.lineWidth = 0.08;
+      ctx.beginPath();
+
+      for (let x = 0; x <= GRID_SIZE; x += 1) {
+        ctx.moveTo(x + 0.5, 0);
+        ctx.lineTo(x + 0.5, GRID_SIZE);
+      }
+
+      for (let y = 0; y <= GRID_SIZE; y += 1) {
+        ctx.moveTo(0, y + 0.5);
+        ctx.lineTo(GRID_SIZE, y + 0.5);
+      }
+
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function applyCanvasTransform() {
+      const centerX = stage.clientWidth / 2;
+      const centerY = stage.clientHeight / 2;
+      canvas.style.transform = `translate(${centerX + state.offsetX * state.scale}px, ${centerY + state.offsetY * state.scale}px) scale(${state.scale})`;
+      zoomValue.textContent = `${Math.round(state.scale * 100)}%`;
+    }
+
+    function clampScale(value) {
+      return Math.min(state.maxScale, Math.max(state.minScale, value));
+    }
+
+    function zoomAt(clientX, clientY, zoomFactor) {
+      const rect = stage.getBoundingClientRect();
+      const stageX = clientX - rect.left;
+      const stageY = clientY - rect.top;
+      const centerX = stage.clientWidth / 2;
+      const centerY = stage.clientHeight / 2;
+
+      const worldX = (stageX - centerX) / state.scale - state.offsetX;
+      const worldY = (stageY - centerY) / state.scale - state.offsetY;
+
+      const newScale = clampScale(state.scale * zoomFactor);
+      state.offsetX = (stageX - centerX) / newScale - worldX;
+      state.offsetY = (stageY - centerY) / newScale - worldY;
+      state.scale = newScale;
+
+      applyCanvasTransform();
+      drawCanvas();
+    }
+
+    function zoomCentered(zoomFactor) {
+      const rect = stage.getBoundingClientRect();
+      zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, zoomFactor);
+    }
+
+    function screenToWorld(clientX, clientY) {
+      const rect = stage.getBoundingClientRect();
+      const stageX = clientX - rect.left;
+      const stageY = clientY - rect.top;
+      const centerX = stage.clientWidth / 2;
+      const centerY = stage.clientHeight / 2;
+
+      const x = Math.floor((stageX - centerX) / state.scale - state.offsetX);
+      const y = Math.floor((stageY - centerY) / state.scale - state.offsetY);
+      return { x, y };
+    }
+
+    function updateHover(clientX, clientY) {
+      const { x, y } = screenToWorld(clientX, clientY);
+      state.hoveredX = x;
+      state.hoveredY = y;
+
+      if (x >= 0 && y >= 0 && x < GRID_SIZE && y < GRID_SIZE) {
+        hoverValue.textContent = `${x}, ${y}`;
+      } else {
+        hoverValue.textContent = '-';
+      }
+
+      drawCanvas();
+    }
+
+    function updateStatus() {
+      soldValue.textContent = state.soldCount.toLocaleString('de-DE');
+      zoomValue.textContent = `${Math.round(state.scale * 100)}%`;
+    }
+
+    function openWindow(type) {
+      overlay.classList.add('open');
+
+      const templates = {
+        info: `
+          <div class="window-header">
+            <h2>Projektübersicht</h2>
+            <button onclick="closeWindow()">Schließen</button>
+          </div>
+          <p>Dies ist ein erster Prototyp für GitHub Pages. Das 1000 mal 1000 Canvas läuft komplett statisch im Browser.</p>
+          <div class="panel-block legend">
+            <div class="swatch free"></div><div>Weiß: Pixel ist noch frei</div>
+            <div class="swatch sold"></div><div>Blau: Pixel ist bereits gekauft</div>
+          </div>
+          <div class="note">Ein Klick auf ein Pixel setzt aktuell testweise zwischen frei und gekauft um.</div>
+        `,
+        stats: `
+          <div class="window-header">
+            <h2>Statistik</h2>
+            <button onclick="closeWindow()">Schließen</button>
+          </div>
+          <div class="panel-block">
+            <p>Gesamtpixel: <strong>${(GRID_SIZE * GRID_SIZE).toLocaleString('de-DE')}</strong></p>
+            <p>Verkauft: <strong>${state.soldCount.toLocaleString('de-DE')}</strong></p>
+            <p>Frei: <strong>${(GRID_SIZE * GRID_SIZE - state.soldCount).toLocaleString('de-DE')}</strong></p>
+          </div>
+          <p class="mini">Diese Zahlen basieren auf dem aktuell geladenen JSON-Zustand.</p>
+        `,
+        storage: `
+          <div class="window-header">
+            <h2>Speicherung</h2>
+            <button onclick="closeWindow()">Schließen</button>
+          </div>
+          <p>Auf GitHub Pages gibt es ohne zusätzliches Backend keine serverseitige Datenbank. Deshalb speichert dieser Prototyp lokal im Browser und erlaubt Export und Import als JSON.</p>
+          <div class="toolbar-row">
+            <button onclick="exportStateAsJson()">JSON exportieren</button>
+            <button onclick="document.getElementById('jsonImportInput').click()">JSON importieren</button>
+            <button class="danger" onclick="resetState()">Alles zurücksetzen</button>
+          </div>
+          <div class="panel-block">
+            <p>Später kann diese Struktur z. B. durch ein Backend mit API ersetzt werden, etwa Node.js, PostgreSQL oder Supabase.</p>
+            <pre><code>{
+  "version": 1,
+  "gridSize": 1000,
+  "soldCount": ${state.soldCount},
+  "pixels": [0, 0, 1, 0, 1]
+}</code></pre>
+          </div>
+        `,
+        help: `
+          <div class="window-header">
+            <h2>Bedienung</h2>
+            <button onclick="closeWindow()">Schließen</button>
+          </div>
+          <ul>
+            <li>Mausrad zoomt hinein und heraus.</li>
+            <li>Die Plus- und Minus-Buttons links oben machen dasselbe.</li>
+            <li>Mit gedrückter linker Maustaste kannst du die Fläche verschieben.</li>
+            <li>Ein einfacher Klick auf ein Pixel toggelt den Zustand frei oder gekauft.</li>
+          </ul>
+          <div class="note">Für den späteren Live-Betrieb solltest du statt Toggle eine echte Kauf-Logik mit Nutzerkonto, Reservierung und Zahlung anbinden.</div>
+        `,
+      };
+
+      windowContent.innerHTML = templates[type] || templates.info;
+    }
+
+    function closeWindow() {
+      overlay.classList.remove('open');
+      windowContent.innerHTML = '';
+    }
+
+    window.closeWindow = closeWindow;
+    window.exportStateAsJson = exportStateAsJson;
+    window.resetState = resetState;
+
+    document.querySelectorAll('[data-window]').forEach(button => {
+      button.addEventListener('click', () => openWindow(button.dataset.window));
+    });
+
+    overlay.addEventListener('click', event => {
+      if (event.target === overlay) closeWindow();
+    });
+
+    document.getElementById('zoomInBtn').addEventListener('click', () => zoomCentered(1.2));
+    document.getElementById('zoomOutBtn').addEventListener('click', () => zoomCentered(1 / 1.2));
+
+    stage.addEventListener('wheel', event => {
+      event.preventDefault();
+      const zoomFactor = event.deltaY < 0 ? 1.12 : 1 / 1.12;
+      zoomAt(event.clientX, event.clientY, zoomFactor);
+    }, { passive: false });
+
+    stage.addEventListener('mousedown', event => {
+      state.isDragging = true;
+      stage.classList.add('dragging');
+      state.dragStartX = event.clientX;
+      state.dragStartY = event.clientY;
+    });
+
+    window.addEventListener('mousemove', event => {
+      updateHover(event.clientX, event.clientY);
+
+      if (!state.isDragging) return;
+      const dx = event.clientX - state.dragStartX;
+      const dy = event.clientY - state.dragStartY;
+      state.dragStartX = event.clientX;
+      state.dragStartY = event.clientY;
+      state.offsetX += dx / state.scale;
+      state.offsetY += dy / state.scale;
+      applyCanvasTransform();
+    });
+
+    window.addEventListener('mouseup', () => {
+      state.isDragging = false;
+      stage.classList.remove('dragging');
+    });
+
+    stage.addEventListener('mouseleave', () => {
+      state.hoveredX = null;
+      state.hoveredY = null;
+      hoverValue.textContent = '-';
+      drawCanvas();
+    });
+
+    stage.addEventListener('click', event => {
+      if (state.isDragging) return;
+      const { x, y } = screenToWorld(event.clientX, event.clientY);
+      if (x < 0 || y < 0 || x >= GRID_SIZE || y >= GRID_SIZE) return;
+      const current = getPixel(x, y);
+      setPixel(x, y, current === SOLD_PIXEL ? DEFAULT_PIXEL : SOLD_PIXEL);
+    });
+
+    jsonImportInput.addEventListener('change', event => {
+      const file = event.target.files?.[0];
+      if (file) importStateFromJson(file);
+      event.target.value = '';
+    });
+
+    function initialize() {
+      const loaded = loadPersistedState();
+      if (!loaded) {
+        state.pixels = createInitialPixelState();
+        persistState();
+      }
+      drawCanvas();
+      applyCanvasTransform();
+      updateStatus();
+      openWindow('help');
+    }
+
+    initialize();
+  </script>
 </body>
 </html>
-
