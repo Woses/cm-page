@@ -1,18 +1,18 @@
 <!doctype html>
 <html lang="de">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pixel Canvas Demo</title>
-  <link rel="stylesheet" href="style.v2.css?v=2">
+  <link rel="stylesheet" href="style.v3.css?v=3">
 </head>
 <body>
-  <header class="topbar">
+  <header class="site-header">
     <div class="brand">
-      <div class="brand-icon">PX</div>
+      <div class="brand-badge">PX</div>
       <div>
         <strong>Pixel Canvas Demo</strong>
-        <span>1000 × 1000 Reveal Canvas</span>
+        <span>1000 × 1000 Pixel mit lokalem JSON Status</span>
       </div>
     </div>
 
@@ -25,27 +25,27 @@
     </div>
   </header>
 
-  <main class="page">
-    <section id="viewer" class="viewer">
-      <canvas id="pixel-canvas" width="1000" height="1000"></canvas>
+  <main class="page-main">
+    <section class="viewer" id="viewer">
+      <canvas id="pixel-canvas" width="1000" height="1000" aria-label="Pixel Canvas"></canvas>
 
-      <div class="zoom-controls">
-        <button type="button" id="zoom-in-button" class="icon-button" aria-label="Hineinzoomen">+</button>
-        <button type="button" id="zoom-out-button" class="icon-button" aria-label="Herauszoomen">−</button>
+      <div class="viewer-toolbar" data-ui-control="true">
+        <button type="button" id="zoom-in-button" class="icon-button" data-ui-control="true" aria-label="Hineinzoomen">+</button>
+        <button type="button" id="zoom-out-button" class="icon-button" data-ui-control="true" aria-label="Herauszoomen">−</button>
       </div>
 
-      <div class="viewer-cards">
+      <div class="viewer-cards" data-ui-control="true">
         <div class="viewer-card">
           <strong id="sold-counter">0 / 1.000.000 verkauft</strong>
           <span id="progress-text">0,0000 % sichtbar</span>
         </div>
         <div class="viewer-card">
           <strong id="zoom-text">Zoom 100 %</strong>
-          <span>Scrollen zum Zoomen, Ziehen zum Verschieben</span>
+          <span>Mausrad zum Zoomen, Ziehen zum Verschieben</span>
         </div>
       </div>
 
-      <button type="button" class="buy-button" id="buy-button">Pixel kaufen</button>
+      <button type="button" class="buy-button" id="buy-button" data-ui-control="true">Pixel kaufen</button>
     </section>
   </main>
 
@@ -54,51 +54,56 @@
       <div class="modal-header">
         <div>
           <h2>Info</h2>
-          <p>
-            Gekaufte Pixel werden zufällig aus allen noch freien Pixeln ausgewählt.
-            Jedes verkaufte Pixel wechselt von Weiß auf den passenden Bildpunkt aus <code>testbild.jpg</code>.
-          </p>
+          <p>Die Pixel werden zufällig aus den noch freien Pixeln ausgewählt. Ein gekauftes Pixel zeigt dann den entsprechenden Bildpunkt aus <code>testbild.jpg</code>.</p>
         </div>
         <button type="button" data-close-modal>Schließen</button>
       </div>
-      <div class="modal-content two-columns">
-        <div class="info-box">
-          <strong>Lokale Speicherung</strong>
-          <p>Der Status wird aktuell als JSON im Browser gespeichert. Damit funktioniert die Demo auch auf GitHub Pages.</p>
+      <div class="modal-content grid-cards">
+        <div class="info-card">
+          <strong>Lokal im Browser</strong>
+          <span>Der Status wird als JSON Modell in <code>localStorage</code> gespeichert.</span>
         </div>
-        <div class="info-box">
-          <strong>Späterer Serverbetrieb</strong>
-          <p>Später kann dieselbe Oberfläche an eine API, Datenbank oder serverseitige JSON angebunden werden.</p>
+        <div class="info-card">
+          <strong>Später Serverfähig</strong>
+          <span>Das gleiche JSON Format kann später an eine API oder Datenbank angebunden werden.</span>
+        </div>
+        <div class="info-card">
+          <strong>Keine Auswahl per Hand</strong>
+          <span>Die zu kaufenden Pixel werden vollständig zufällig verteilt.</span>
+        </div>
+        <div class="info-card">
+          <strong>Canvas Viewer</strong>
+          <span>Passt sich an die Fenstergröße an und unterstützt Zoom sowie Verschieben.</span>
         </div>
       </div>
     </div>
   </div>
 
   <div class="overlay" id="stats-modal" aria-hidden="true">
-    <div class="modal">
+    <div class="modal modal-small">
       <div class="modal-header">
         <div>
           <h2>Statistik</h2>
-          <p>Aktueller lokaler Stand der Demo.</p>
+          <p>Aktueller lokaler Stand dieses Browsers.</p>
         </div>
         <button type="button" data-close-modal>Schließen</button>
       </div>
-      <div class="modal-content two-columns">
-        <div class="info-box">
+      <div class="modal-content grid-cards">
+        <div class="info-card">
           <strong id="stats-sold">0</strong>
-          <p>verkaufte Pixel</p>
+          <span>verkaufte Pixel</span>
         </div>
-        <div class="info-box">
+        <div class="info-card">
           <strong id="stats-free">1.000.000</strong>
-          <p>freie Pixel</p>
+          <span>freie Pixel</span>
         </div>
-        <div class="info-box">
+        <div class="info-card">
           <strong id="stats-percent">0,0000 %</strong>
-          <p>sichtbarer Anteil</p>
+          <span>sichtbarer Anteil</span>
         </div>
-        <div class="info-box">
-          <strong id="stats-storage">0 KB</strong>
-          <p>lokaler JSON Speicherbedarf</p>
+        <div class="info-card">
+          <strong id="stats-zoom">100 %</strong>
+          <span>aktueller Zoom</span>
         </div>
       </div>
     </div>
@@ -109,9 +114,7 @@
       <div class="modal-header">
         <div>
           <h2>Pixel kaufen</h2>
-          <p>
-            Trage ein, wie viele Pixel nach einer erfolgreichen Zahlung zufällig gekauft werden sollen.
-          </p>
+          <p>Trage ein, wie viele Pixel nach einer erfolgreichen Zahlung zufällig gekauft werden sollen.</p>
         </div>
         <button type="button" data-close-modal>Schließen</button>
       </div>
@@ -127,8 +130,8 @@
     </div>
   </div>
 
-  <div class="toast" id="toast"></div>
+  <div id="toast" class="toast" aria-live="polite"></div>
 
-  <script src="app.v2.js?v=2"></script>
+  <script src="app.v3.js?v=3"></script>
 </body>
 </html>
