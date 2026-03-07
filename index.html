@@ -3,34 +3,35 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Pixel Reveal Demo</title>
+  <title>Pixel Canvas Demo</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="app-header">
+  <header class="topbar">
     <div class="brand">
-      <div class="brand-badge">PX</div>
+      <div class="brand-icon">PX</div>
       <div>
-        <h1>Pixel Reveal</h1>
-        <p>1000 x 1000 Pixel Demo</p>
+        <strong>Pixel Canvas Demo</strong>
+        <span>1000 × 1000 Reveal Canvas</span>
       </div>
     </div>
 
-    <nav class="header-actions">
-      <button type="button" class="header-btn" data-open-modal="info-modal">Info</button>
-      <button type="button" class="header-btn" data-open-modal="stats-modal">Statistik</button>
-      <button type="button" class="header-btn" id="fit-view-btn">Ansicht zentrieren</button>
-      <button type="button" class="header-btn danger" id="reset-btn">Demo zurücksetzen</button>
-    </nav>
+    <div class="header-actions">
+      <button type="button" data-open-modal="info-modal">Info</button>
+      <button type="button" data-open-modal="stats-modal">Statistik</button>
+      <button type="button" id="fit-view-button">Ansicht zentrieren</button>
+      <button type="button" id="export-json-button">JSON exportieren</button>
+      <button type="button" id="reset-button" class="danger">Zurücksetzen</button>
+    </div>
   </header>
 
-  <main class="app-main">
-    <section class="viewer" id="viewer">
-      <canvas id="pixel-canvas" width="1000" height="1000" aria-label="Pixel Canvas"></canvas>
+  <main class="page">
+    <section id="viewer" class="viewer">
+      <canvas id="pixel-canvas" width="1000" height="1000"></canvas>
 
-      <div class="viewer-toolbar">
-        <button type="button" class="tool-btn" id="zoom-in-btn" aria-label="Hineinzoomen">+</button>
-        <button type="button" class="tool-btn" id="zoom-out-btn" aria-label="Herauszoomen">-</button>
+      <div class="zoom-controls">
+        <button type="button" id="zoom-in-button" class="icon-button" aria-label="Hineinzoomen">+</button>
+        <button type="button" id="zoom-out-button" class="icon-button" aria-label="Herauszoomen">−</button>
       </div>
 
       <div class="viewer-cards">
@@ -40,7 +41,7 @@
         </div>
         <div class="viewer-card">
           <strong id="zoom-text">Zoom 100 %</strong>
-          <span>Ziehen zum Verschieben, Mausrad zum Zoomen</span>
+          <span>Scrollen zum Zoomen, Ziehen zum Verschieben</span>
         </div>
       </div>
 
@@ -48,88 +49,85 @@
     </section>
   </main>
 
-  <section class="modal-backdrop" id="info-modal" aria-hidden="true">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="info-title">
+  <div class="overlay" id="info-modal" aria-hidden="true">
+    <div class="modal">
       <div class="modal-header">
         <div>
-          <h2 id="info-title">Über diese Demo</h2>
-          <p>Freie Pixel bleiben weiß. Verkaufte Pixel zeigen den passenden Bildpunkt aus <code>testbild.jpg</code>.</p>
+          <h2>Info</h2>
+          <p>
+            Gekaufte Pixel werden zufällig aus allen noch freien Pixeln ausgewählt.
+            Jedes verkaufte Pixel wechselt von Weiß auf den passenden Bildpunkt aus <code>testbild.jpg</code>.
+          </p>
         </div>
-        <button type="button" class="header-btn" data-close-modal>Schließen</button>
+        <button type="button" data-close-modal>Schließen</button>
       </div>
-      <div class="modal-content two-col">
-        <article class="info-box">
-          <h3>GitHub Pages</h3>
-          <p>Diese Version speichert den Zustand lokal im Browser mit IndexedDB.</p>
-        </article>
-        <article class="info-box">
-          <h3>Späterer Server</h3>
-          <p>Ein echtes Backend kann später dieselbe Oberfläche weiterverwenden.</p>
-        </article>
-        <article class="info-box">
-          <h3>Zufälliger Kauf</h3>
-          <p>Die Pixel werden nicht manuell gewählt, sondern zufällig aus freien Pixeln gezogen.</p>
-        </article>
-        <article class="info-box">
-          <h3>Bildgröße</h3>
-          <p>Das Bild sollte 1000 x 1000 Pixel groß sein und als <code>testbild.jpg</code> im selben Ordner liegen.</p>
-        </article>
+      <div class="modal-content two-columns">
+        <div class="info-box">
+          <strong>Lokale Speicherung</strong>
+          <p>Der Status wird aktuell als JSON im Browser gespeichert. Damit funktioniert die Demo auch auf GitHub Pages.</p>
+        </div>
+        <div class="info-box">
+          <strong>Späterer Serverbetrieb</strong>
+          <p>Später kann dieselbe Oberfläche an eine API, Datenbank oder serverseitige JSON angebunden werden.</p>
+        </div>
       </div>
     </div>
-  </section>
+  </div>
 
-  <section class="modal-backdrop" id="stats-modal" aria-hidden="true">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="stats-title">
+  <div class="overlay" id="stats-modal" aria-hidden="true">
+    <div class="modal">
       <div class="modal-header">
         <div>
-          <h2 id="stats-title">Statistik</h2>
-          <p>Aktuelle Werte des lokalen Demo-Standes.</p>
+          <h2>Statistik</h2>
+          <p>Aktueller lokaler Stand der Demo.</p>
         </div>
-        <button type="button" class="header-btn" data-close-modal>Schließen</button>
+        <button type="button" data-close-modal>Schließen</button>
       </div>
-      <div class="modal-content two-col">
-        <article class="info-box">
-          <h3>Verkauft</h3>
-          <p id="stats-sold">0</p>
-        </article>
-        <article class="info-box">
-          <h3>Frei</h3>
-          <p id="stats-free">1.000.000</p>
-        </article>
-        <article class="info-box">
-          <h3>Sichtbar</h3>
-          <p id="stats-visible">0,0000 %</p>
-        </article>
-        <article class="info-box">
-          <h3>Status</h3>
-          <p id="stats-status">testbild.jpg noch nicht sichtbar</p>
-        </article>
+      <div class="modal-content two-columns">
+        <div class="info-box">
+          <strong id="stats-sold">0</strong>
+          <p>verkaufte Pixel</p>
+        </div>
+        <div class="info-box">
+          <strong id="stats-free">1.000.000</strong>
+          <p>freie Pixel</p>
+        </div>
+        <div class="info-box">
+          <strong id="stats-percent">0,0000 %</strong>
+          <p>sichtbarer Anteil</p>
+        </div>
+        <div class="info-box">
+          <strong id="stats-storage">0 KB</strong>
+          <p>lokaler JSON Speicherbedarf</p>
+        </div>
       </div>
     </div>
-  </section>
+  </div>
 
-  <section class="modal-backdrop" id="buy-modal" aria-hidden="true">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="buy-title">
+  <div class="overlay" id="buy-modal" aria-hidden="true">
+    <div class="modal modal-small">
       <div class="modal-header">
         <div>
-          <h2 id="buy-title">Pixel kaufen</h2>
-          <p>Hier wird später ein Zahlungsdienst eingebunden. Aktuell wird der erfolgreiche Kauf simuliert.</p>
+          <h2>Pixel kaufen</h2>
+          <p>
+            Trage ein, wie viele Pixel nach einer erfolgreichen Zahlung zufällig gekauft werden sollen.
+          </p>
         </div>
-        <button type="button" class="header-btn" data-close-modal>Schließen</button>
+        <button type="button" data-close-modal>Schließen</button>
       </div>
       <div class="modal-content">
-        <label class="field-label" for="pixel-count-input">Anzahl der Pixel</label>
-        <input id="pixel-count-input" class="field-input" type="number" min="1" step="1" value="100">
-        <p class="field-hint">Es werden automatisch freie Pixel zufällig ausgewählt.</p>
+        <label class="field-label" for="pixel-count-input">Anzahl an Pixeln</label>
+        <input id="pixel-count-input" type="number" min="1" step="1" value="100">
+        <p class="field-hint">Es werden keine Pixel manuell markiert. Die Auswahl erfolgt automatisch zufällig.</p>
         <div class="modal-actions">
-          <button type="button" class="header-btn" data-close-modal>Abbrechen</button>
-          <button type="button" class="header-btn primary" id="confirm-buy-btn">Kauf simulieren</button>
+          <button type="button" data-close-modal>Abbrechen</button>
+          <button type="button" class="primary" id="confirm-buy-button">Kauf simulieren</button>
         </div>
       </div>
     </div>
-  </section>
+  </div>
 
-  <div class="toast" id="toast" aria-live="polite"></div>
+  <div class="toast" id="toast"></div>
 
   <script src="script.js"></script>
 </body>

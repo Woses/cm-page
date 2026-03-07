@@ -1,46 +1,44 @@
 const GRID_WIDTH = 1000;
 const GRID_HEIGHT = 1000;
 const TOTAL_PIXELS = GRID_WIDTH * GRID_HEIGHT;
-const MIN_ZOOM = 0.5;
+const STORAGE_KEY = 'pixelCanvasStateJsonV1';
+const BITSET_SIZE = Math.ceil(TOTAL_PIXELS / 8);
+const MIN_ZOOM = 0.4;
 const MAX_ZOOM = 40;
-const ZOOM_STEP = 1.15;
-const DB_NAME = 'pixelRevealDemoDB';
-const STORE_NAME = 'stateStore';
-const STATE_ID = 'main';
-const BITSET_BYTES = Math.ceil(TOTAL_PIXELS / 8);
+const ZOOM_FACTOR = 1.15;
 
 const canvas = document.getElementById('pixel-canvas');
 const ctx = canvas.getContext('2d', { alpha: false });
 const viewer = document.getElementById('viewer');
-const toast = document.getElementById('toast');
-
-const soldCounterEl = document.getElementById('sold-counter');
-const progressTextEl = document.getElementById('progress-text');
-const zoomTextEl = document.getElementById('zoom-text');
-const statsSoldEl = document.getElementById('stats-sold');
-const statsFreeEl = document.getElementById('stats-free');
-const statsVisibleEl = document.getElementById('stats-visible');
-const statsStatusEl = document.getElementById('stats-status');
+const buyButton = document.getElementById('buy-button');
+const confirmBuyButton = document.getElementById('confirm-buy-button');
 const pixelCountInput = document.getElementById('pixel-count-input');
+const toastElement = document.getElementById('toast');
 
-const revealCanvas = document.createElement('canvas');
-revealCanvas.width = GRID_WIDTH;
-revealCanvas.height = GRID_HEIGHT;
-const revealCtx = revealCanvas.getContext('2d', { alpha: false, willReadFrequently: true });
+const soldCounterElement = document.getElementById('sold-counter');
+const progressTextElement = document.getElementById('progress-text');
+const zoomTextElement = document.getElementById('zoom-text');
+const statsSoldElement = document.getElementById('stats-sold');
+const statsFreeElement = document.getElementById('stats-free');
+const statsPercentElement = document.getElementById('stats-percent');
+const statsStorageElement = document.getElementById('stats-storage');
+
+const offscreenCanvas = document.createElement('canvas');
+offscreenCanvas.width = GRID_WIDTH;
+offscreenCanvas.height = GRID_HEIGHT;
+const offscreenCtx = offscreenCanvas.getContext('2d', { alpha: false });
+
+offscreenCtx.imageSmoothingEnabled = false;
+ctx.imageSmoothingEnabled = false;
 
 const sourceCanvas = document.createElement('canvas');
 sourceCanvas.width = GRID_WIDTH;
 sourceCanvas.height = GRID_HEIGHT;
 const sourceCtx = sourceCanvas.getContext('2d', { alpha: false, willReadFrequently: true });
 
-let db = null;
-let sourceImageData = null;
-let renderQueued = false;
-let imageLoaded = false;
-
 const state = {
   soldCount: 0,
-  bits: new Uint8Array(BITSET_BYTES)
+  bits: new Uint8Array(BITSET_SIZE)
 };
 
 const view = {
@@ -51,6 +49,11 @@ const view = {
   lastX: 0,
   lastY: 0
 };
+
+let sourceImageData = null;
+let toastTimer = null;
+let renderScheduled = false;
+let appReady = false;
 
 function formatNumber(value) {
   return new Intl.NumberFormat('de-DE').format(value);
@@ -63,117 +66,224 @@ function formatPercent(value) {
   }).format(value);
 }
 
-function setToast(message) {
-  toast.textContent = message;
-  toast.classList.add('show');
-  clearTimeout(setToast.timer);
-  setToast.timer = setTimeout(() => {
-    toast.classList.remove('show');
+function showToast(message) {
+  toastElement.textContent = message;
+  toastElement.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    toastElement.classList.remove('show');
   }, 2200);
+}
+
+function openModal(id) {
+  const modal = document.getElementById(id);
+  if (!modal) return;
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden', 'false');
+}
+
+function closeModal(modal) {
+  if (!modal) return;
+  modal.classList.remove('open');
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+function fillWhiteCanvas() {
+  offscreenCtx.setTransform(1, 0, 0, 1, 0, 0);
+  offscreenCtx.fillStyle = '#ffffff';
+  offscreenCtx.fillRect(0, 0, GRID_WIDTH, GRID_HEIGHT);
 }
 
 function isSold(index) {
   return ((state.bits[index >> 3] >> (index & 7)) & 1) === 1;
 }
 
-function setSold(index) {
+function markSold(index) {
   state.bits[index >> 3] |= 1 << (index & 7);
 }
 
-function clearAllSold() {
-  state.bits = new Uint8Array(BITSET_BYTES);
-  state.soldCount = 0;
+function bytesToBase64(bytes) {
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    const slice = bytes.subarray(i, i + chunk);
+    binary += String.fromCharCode(...slice);
+  }
+  return btoa(binary);
 }
 
-function fillRevealWhite() {
-  revealCtx.save();
-  revealCtx.setTransform(1, 0, 0, 1, 0, 0);
-  revealCtx.fillStyle = '#ffffff';
-  revealCtx.fillRect(0, 0, GRID_WIDTH, GRID_HEIGHT);
-  revealCtx.restore();
+function base64ToBytes(base64) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
 }
 
-function revealSinglePixel(index) {
-  if (!sourceImageData) {
+function serializeState() {
+  return JSON.stringify({
+    version: 1,
+    soldCount: state.soldCount,
+    bitsetBase64: bytesToBase64(state.bits)
+  });
+}
+
+function saveState() {
+  const json = serializeState();
+  localStorage.setItem(STORAGE_KEY, json);
+  updateStats();
+  return json;
+}
+
+function loadState() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) {
+    fillWhiteCanvas();
     return;
   }
 
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed.soldCount !== 'number' || typeof parsed.bitsetBase64 !== 'string') {
+      throw new Error('Ungültiger lokaler Status');
+    }
+
+    const bytes = base64ToBytes(parsed.bitsetBase64);
+    if (bytes.length !== BITSET_SIZE) {
+      throw new Error('Falsche Bitset-Länge');
+    }
+
+    state.soldCount = Math.max(0, Math.min(TOTAL_PIXELS, Math.floor(parsed.soldCount)));
+    state.bits.set(bytes);
+  } catch (error) {
+    console.warn('Lokaler Status konnte nicht geladen werden, Status wird zurückgesetzt.', error);
+    localStorage.removeItem(STORAGE_KEY);
+    state.soldCount = 0;
+    state.bits.fill(0);
+  }
+
+  rebuildCanvasFromState();
+}
+
+function exportStateAsJsonFile() {
+  const json = serializeState();
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  link.href = url;
+  link.download = `pixel-status-${stamp}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  showToast('JSON wurde exportiert');
+}
+
+function revealPixel(index) {
+  if (!sourceImageData) return;
   const x = index % GRID_WIDTH;
-  const y = Math.floor(index / GRID_WIDTH);
-  const srcOffset = index * 4;
-  const pixel = sourceImageData.data;
-  const rgba = revealCtx.createImageData(1, 1);
-  rgba.data[0] = pixel[srcOffset];
-  rgba.data[1] = pixel[srcOffset + 1];
-  rgba.data[2] = pixel[srcOffset + 2];
-  rgba.data[3] = 255;
-  revealCtx.putImageData(rgba, x, y);
+  const y = (index / GRID_WIDTH) | 0;
+  const offset = index * 4;
+  const data = sourceImageData.data;
+  offscreenCtx.fillStyle = `rgb(${data[offset]}, ${data[offset + 1]}, ${data[offset + 2]})`;
+  offscreenCtx.fillRect(x, y, 1, 1);
 }
 
-function rebuildRevealCanvas() {
-  fillRevealWhite();
-
-  if (!sourceImageData) {
-    requestRender();
+function rebuildCanvasFromState() {
+  fillWhiteCanvas();
+  if (!sourceImageData || state.soldCount === 0) {
+    scheduleRender();
     return;
   }
 
-  for (let i = 0; i < TOTAL_PIXELS; i += 1) {
-    if (isSold(i)) {
-      revealSinglePixel(i);
+  for (let index = 0; index < TOTAL_PIXELS; index++) {
+    if (isSold(index)) {
+      revealPixel(index);
     }
   }
 
-  requestRender();
+  scheduleRender();
+}
+
+function clampOffsets() {
+  const rect = viewer.getBoundingClientRect();
+  const contentWidth = GRID_WIDTH * view.zoom;
+  const contentHeight = GRID_HEIGHT * view.zoom;
+
+  if (contentWidth <= rect.width) {
+    view.offsetX = (rect.width - contentWidth) / 2;
+  }
+  if (contentHeight <= rect.height) {
+    view.offsetY = (rect.height - contentHeight) / 2;
+  }
 }
 
 function updateStats() {
   const sold = state.soldCount;
   const free = TOTAL_PIXELS - sold;
-  const visiblePercent = (sold / TOTAL_PIXELS) * 100;
+  const percent = (sold / TOTAL_PIXELS) * 100;
+  const raw = localStorage.getItem(STORAGE_KEY) || serializeState();
+  const estimatedKb = raw ? `${(new Blob([raw]).size / 1024).toFixed(1)} KB` : '0 KB';
 
-  soldCounterEl.textContent = `${formatNumber(sold)} / ${formatNumber(TOTAL_PIXELS)} verkauft`;
-  progressTextEl.textContent = `${formatPercent(visiblePercent)} % sichtbar`;
-  zoomTextEl.textContent = `Zoom ${Math.round(view.zoom * 100)} %`;
+  soldCounterElement.textContent = `${formatNumber(sold)} / ${formatNumber(TOTAL_PIXELS)} verkauft`;
+  progressTextElement.textContent = `${formatPercent(percent)} % sichtbar`;
+  zoomTextElement.textContent = `Zoom ${Math.round(view.zoom * 100)} %`;
 
-  statsSoldEl.textContent = formatNumber(sold);
-  statsFreeEl.textContent = formatNumber(free);
-  statsVisibleEl.textContent = `${formatPercent(visiblePercent)} %`;
-  statsStatusEl.textContent = imageLoaded ? 'testbild.jpg geladen' : 'testbild.jpg nicht geladen';
+  statsSoldElement.textContent = formatNumber(sold);
+  statsFreeElement.textContent = formatNumber(free);
+  statsPercentElement.textContent = `${formatPercent(percent)} %`;
+  statsStorageElement.textContent = estimatedKb;
 }
 
-function requestRender() {
-  if (renderQueued) {
-    return;
-  }
-
-  renderQueued = true;
-  requestAnimationFrame(drawViewer);
+function fitToView() {
+  const rect = viewer.getBoundingClientRect();
+  const zoomX = rect.width / GRID_WIDTH;
+  const zoomY = rect.height / GRID_HEIGHT;
+  view.zoom = Math.min(zoomX, zoomY);
+  view.offsetX = (rect.width - GRID_WIDTH * view.zoom) / 2;
+  view.offsetY = (rect.height - GRID_HEIGHT * view.zoom) / 2;
+  updateStats();
+  scheduleRender();
 }
 
-function drawViewer() {
-  renderQueued = false;
+function zoomAt(factor, clientX, clientY) {
+  const rect = viewer.getBoundingClientRect();
+  const localX = clientX - rect.left;
+  const localY = clientY - rect.top;
+  const worldX = (localX - view.offsetX) / view.zoom;
+  const worldY = (localY - view.offsetY) / view.zoom;
+  const nextZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, view.zoom * factor));
 
+  view.zoom = nextZoom;
+  view.offsetX = localX - worldX * view.zoom;
+  view.offsetY = localY - worldY * view.zoom;
+  clampOffsets();
+  updateStats();
+  scheduleRender();
+}
+
+function draw() {
+  renderScheduled = false;
   const rect = viewer.getBoundingClientRect();
   const dpr = window.devicePixelRatio || 1;
-  const targetWidth = Math.max(1, Math.round(rect.width * dpr));
-  const targetHeight = Math.max(1, Math.round(rect.height * dpr));
+  const pixelWidth = Math.max(1, Math.round(rect.width * dpr));
+  const pixelHeight = Math.max(1, Math.round(rect.height * dpr));
 
-  if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
-    canvas.width = targetWidth;
-    canvas.height = targetHeight;
+  if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+    canvas.width = pixelWidth;
+    canvas.height = pixelHeight;
   }
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = '#09111f';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-  ctx.fillStyle = '#0f172a';
-  ctx.fillRect(0, 0, rect.width, rect.height);
-
+  ctx.imageSmoothingEnabled = false;
   ctx.drawImage(
-    revealCanvas,
+    offscreenCanvas,
     0,
     0,
     GRID_WIDTH,
@@ -185,66 +295,77 @@ function drawViewer() {
   );
 }
 
-function fitView() {
-  const rect = viewer.getBoundingClientRect();
-  const zoomX = rect.width / GRID_WIDTH;
-  const zoomY = rect.height / GRID_HEIGHT;
-  view.zoom = Math.min(zoomX, zoomY);
-  view.offsetX = (rect.width - GRID_WIDTH * view.zoom) / 2;
-  view.offsetY = (rect.height - GRID_HEIGHT * view.zoom) / 2;
-  updateStats();
-  requestRender();
+function scheduleRender() {
+  if (renderScheduled) return;
+  renderScheduled = true;
+  requestAnimationFrame(draw);
 }
 
-function clampOffsets() {
-  const rect = viewer.getBoundingClientRect();
-  const scaledWidth = GRID_WIDTH * view.zoom;
-  const scaledHeight = GRID_HEIGHT * view.zoom;
+function getRandomUnsoldIndex() {
+  if (state.soldCount >= TOTAL_PIXELS) return -1;
 
-  if (scaledWidth <= rect.width) {
-    view.offsetX = (rect.width - scaledWidth) / 2;
+  for (let tries = 0; tries < 200; tries++) {
+    const candidate = (Math.random() * TOTAL_PIXELS) | 0;
+    if (!isSold(candidate)) return candidate;
   }
 
-  if (scaledHeight <= rect.height) {
-    view.offsetY = (rect.height - scaledHeight) / 2;
+  for (let index = 0; index < TOTAL_PIXELS; index++) {
+    if (!isSold(index)) return index;
   }
+
+  return -1;
 }
 
-function zoomAt(factor, clientX, clientY) {
-  const rect = viewer.getBoundingClientRect();
-  const localX = clientX - rect.left;
-  const localY = clientY - rect.top;
-
-  const worldX = (localX - view.offsetX) / view.zoom;
-  const worldY = (localY - view.offsetY) / view.zoom;
-
-  const nextZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, view.zoom * factor));
-  view.zoom = nextZoom;
-  view.offsetX = localX - worldX * view.zoom;
-  view.offsetY = localY - worldY * view.zoom;
-
-  clampOffsets();
-  updateStats();
-  requestRender();
-}
-
-function openModal(id) {
-  const modal = document.getElementById(id);
-  if (!modal) {
+function purchasePixels(count) {
+  if (!appReady) {
+    showToast('Bild wird noch geladen');
     return;
   }
 
-  modal.classList.add('open');
-  modal.setAttribute('aria-hidden', 'false');
-}
-
-function closeModal(modal) {
-  if (!modal) {
+  const requested = Number(count);
+  if (!Number.isFinite(requested) || requested < 1) {
+    showToast('Bitte eine gültige Anzahl eingeben');
     return;
   }
 
-  modal.classList.remove('open');
-  modal.setAttribute('aria-hidden', 'true');
+  const available = TOTAL_PIXELS - state.soldCount;
+  if (available <= 0) {
+    showToast('Alle Pixel sind bereits verkauft');
+    return;
+  }
+
+  const amount = Math.min(available, Math.floor(requested));
+  let changed = 0;
+
+  for (let i = 0; i < amount; i++) {
+    const index = getRandomUnsoldIndex();
+    if (index === -1) break;
+    markSold(index);
+    revealPixel(index);
+    changed += 1;
+  }
+
+  if (changed > 0) {
+    state.soldCount += changed;
+    saveState();
+    updateStats();
+    scheduleRender();
+    showToast(`${formatNumber(changed)} Pixel gekauft`);
+  }
+
+  if (state.soldCount >= TOTAL_PIXELS) {
+    showToast('Alle Pixel sind verkauft. Das Bild ist komplett sichtbar.');
+  }
+}
+
+function resetState() {
+  state.soldCount = 0;
+  state.bits.fill(0);
+  fillWhiteCanvas();
+  saveState();
+  updateStats();
+  scheduleRender();
+  showToast('Lokaler Status wurde zurückgesetzt');
 }
 
 function bindModalEvents() {
@@ -256,63 +377,57 @@ function bindModalEvents() {
 
   document.querySelectorAll('[data-close-modal]').forEach((button) => {
     button.addEventListener('click', () => {
-      closeModal(button.closest('.modal-backdrop'));
+      closeModal(button.closest('.overlay'));
     });
   });
 
-  document.querySelectorAll('.modal-backdrop').forEach((backdrop) => {
-    backdrop.addEventListener('click', (event) => {
-      if (event.target === backdrop) {
-        closeModal(backdrop);
+  document.querySelectorAll('.overlay').forEach((overlay) => {
+    overlay.addEventListener('click', (event) => {
+      if (event.target === overlay) {
+        closeModal(overlay);
       }
     });
   });
 }
 
-function bindViewerEvents() {
-  document.getElementById('zoom-in-btn').addEventListener('click', () => {
-    const rect = viewer.getBoundingClientRect();
-    zoomAt(ZOOM_STEP, rect.left + rect.width / 2, rect.top + rect.height / 2);
+function bindUiEvents() {
+  buyButton.addEventListener('click', () => {
+    openModal('buy-modal');
+    pixelCountInput.focus();
+    pixelCountInput.select();
   });
 
-  document.getElementById('zoom-out-btn').addEventListener('click', () => {
-    const rect = viewer.getBoundingClientRect();
-    zoomAt(1 / ZOOM_STEP, rect.left + rect.width / 2, rect.top + rect.height / 2);
-  });
-
-  document.getElementById('fit-view-btn').addEventListener('click', fitView);
-  document.getElementById('buy-button').addEventListener('click', () => openModal('buy-modal'));
-
-  document.getElementById('confirm-buy-btn').addEventListener('click', async () => {
-    const amount = Number(pixelCountInput.value);
-    await simulatePurchase(amount);
+  confirmBuyButton.addEventListener('click', () => {
+    purchasePixels(pixelCountInput.value);
     closeModal(document.getElementById('buy-modal'));
   });
 
-  document.getElementById('reset-btn').addEventListener('click', async () => {
-    const confirmed = window.confirm('Soll die Demo wirklich zurückgesetzt werden?');
-    if (!confirmed) {
-      return;
-    }
+  document.getElementById('zoom-in-button').addEventListener('click', () => {
+    const rect = viewer.getBoundingClientRect();
+    zoomAt(ZOOM_FACTOR, rect.left + rect.width / 2, rect.top + rect.height / 2);
+  });
 
-    clearAllSold();
-    rebuildRevealCanvas();
-    updateStats();
-    await saveState();
-    setToast('Demo zurückgesetzt');
+  document.getElementById('zoom-out-button').addEventListener('click', () => {
+    const rect = viewer.getBoundingClientRect();
+    zoomAt(1 / ZOOM_FACTOR, rect.left + rect.width / 2, rect.top + rect.height / 2);
+  });
+
+  document.getElementById('fit-view-button').addEventListener('click', fitToView);
+  document.getElementById('export-json-button').addEventListener('click', exportStateAsJsonFile);
+  document.getElementById('reset-button').addEventListener('click', () => {
+    if (window.confirm('Soll der lokale Status wirklich zurückgesetzt werden?')) {
+      resetState();
+    }
   });
 
   viewer.addEventListener('wheel', (event) => {
     event.preventDefault();
-    const factor = event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
+    const factor = event.deltaY < 0 ? ZOOM_FACTOR : 1 / ZOOM_FACTOR;
     zoomAt(factor, event.clientX, event.clientY);
   }, { passive: false });
 
   viewer.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0) {
-      return;
-    }
-
+    if (event.button !== 0) return;
     view.dragging = true;
     view.lastX = event.clientX;
     view.lastY = event.clientY;
@@ -321,10 +436,7 @@ function bindViewerEvents() {
   });
 
   viewer.addEventListener('pointermove', (event) => {
-    if (!view.dragging) {
-      return;
-    }
-
+    if (!view.dragging) return;
     const dx = event.clientX - view.lastX;
     const dy = event.clientY - view.lastY;
     view.lastX = event.clientX;
@@ -332,201 +444,64 @@ function bindViewerEvents() {
     view.offsetX += dx;
     view.offsetY += dy;
     clampOffsets();
-    requestRender();
+    scheduleRender();
   });
 
-  const endDrag = (event) => {
-    if (!view.dragging) {
-      return;
-    }
-
+  const stopDragging = (event) => {
+    if (!view.dragging) return;
     view.dragging = false;
     canvas.classList.remove('dragging');
-
-    if (event && typeof event.pointerId === 'number' && viewer.hasPointerCapture(event.pointerId)) {
+    if (event && viewer.hasPointerCapture(event.pointerId)) {
       viewer.releasePointerCapture(event.pointerId);
     }
   };
 
-  viewer.addEventListener('pointerup', endDrag);
-  viewer.addEventListener('pointercancel', endDrag);
-  viewer.addEventListener('pointerleave', (event) => {
-    if (event.pointerType === 'mouse') {
-      endDrag(event);
-    }
-  });
+  viewer.addEventListener('pointerup', stopDragging);
+  viewer.addEventListener('pointercancel', stopDragging);
 
   window.addEventListener('resize', () => {
     clampOffsets();
-    requestRender();
+    scheduleRender();
   });
 }
 
-function getRandomUnsoldPixel() {
-  if (state.soldCount >= TOTAL_PIXELS) {
-    return -1;
-  }
-
-  for (let tries = 0; tries < 120; tries += 1) {
-    const index = Math.floor(Math.random() * TOTAL_PIXELS);
-    if (!isSold(index)) {
-      return index;
-    }
-  }
-
-  for (let index = 0; index < TOTAL_PIXELS; index += 1) {
-    if (!isSold(index)) {
-      return index;
-    }
-  }
-
-  return -1;
-}
-
-async function simulatePurchase(amount) {
-  if (!Number.isFinite(amount) || amount <= 0) {
-    setToast('Bitte eine gültige Pixelanzahl eingeben');
-    return;
-  }
-
-  const freePixels = TOTAL_PIXELS - state.soldCount;
-  if (freePixels <= 0) {
-    setToast('Alle Pixel sind bereits verkauft');
-    return;
-  }
-
-  const purchaseCount = Math.min(Math.floor(amount), freePixels);
-  let changed = 0;
-
-  for (let i = 0; i < purchaseCount; i += 1) {
-    const pixelIndex = getRandomUnsoldPixel();
-    if (pixelIndex === -1) {
-      break;
-    }
-
-    setSold(pixelIndex);
-    revealSinglePixel(pixelIndex);
-    changed += 1;
-  }
-
-  if (changed > 0) {
-    state.soldCount += changed;
-    updateStats();
-    requestRender();
-    await saveState();
-    setToast(`${formatNumber(changed)} Pixel gekauft`);
-  }
-
-  if (state.soldCount >= TOTAL_PIXELS) {
-    setToast('Alle Pixel sind verkauft. Das Bild ist vollständig sichtbar.');
-  }
-}
-
-function requestToPromise(request) {
-  return new Promise((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function openDb() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 1);
-
-    request.onupgradeneeded = () => {
-      const database = request.result;
-      if (!database.objectStoreNames.contains(STORE_NAME)) {
-        database.createObjectStore(STORE_NAME, { keyPath: 'id' });
-      }
-    };
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function loadState() {
-  if (!db) {
-    return;
-  }
-
-  const tx = db.transaction(STORE_NAME, 'readonly');
-  const store = tx.objectStore(STORE_NAME);
-  const record = await requestToPromise(store.get(STATE_ID));
-
-  if (!record) {
-    return;
-  }
-
-  if (typeof record.soldCount === 'number') {
-    state.soldCount = record.soldCount;
-  }
-
-  if (record.bits) {
-    state.bits = new Uint8Array(record.bits);
-  }
-}
-
-async function saveState() {
-  if (!db) {
-    return;
-  }
-
-  const tx = db.transaction(STORE_NAME, 'readwrite');
-  const store = tx.objectStore(STORE_NAME);
-  await requestToPromise(store.put({
-    id: STATE_ID,
-    soldCount: state.soldCount,
-    bits: state.bits.buffer.slice(0)
-  }));
-}
-
-async function loadImage() {
+function loadSourceImage() {
   return new Promise((resolve, reject) => {
     const image = new Image();
-
     image.onload = () => {
-      sourceCtx.clearRect(0, 0, GRID_WIDTH, GRID_HEIGHT);
       sourceCtx.drawImage(image, 0, 0, GRID_WIDTH, GRID_HEIGHT);
       sourceImageData = sourceCtx.getImageData(0, 0, GRID_WIDTH, GRID_HEIGHT);
-      imageLoaded = true;
+      rebuildCanvasFromState();
+      appReady = true;
       resolve();
     };
-
     image.onerror = () => {
-      imageLoaded = false;
-      reject(new Error('testbild.jpg konnte nicht geladen werden. Bitte Datei und Pfad prüfen.'));
+      reject(new Error('testbild.jpg konnte nicht geladen werden.'));
     };
-
     image.src = 'testbild.jpg';
   });
 }
 
 async function init() {
-  fillRevealWhite();
-  updateStats();
+  fillWhiteCanvas();
   bindModalEvents();
-  bindViewerEvents();
-  fitView();
-
-  try {
-    db = await openDb();
-    await loadState();
-  } catch (error) {
-    console.error(error);
-    setToast('IndexedDB konnte nicht geöffnet werden');
-  }
-
-  try {
-    await loadImage();
-  } catch (error) {
-    console.error(error);
-    setToast(error.message);
-  }
-
-  rebuildRevealCanvas();
+  bindUiEvents();
+  fitToView();
   updateStats();
-  requestRender();
+  scheduleRender();
+
+  loadState();
+  updateStats();
+  scheduleRender();
+
+  try {
+    await loadSourceImage();
+    updateStats();
+    scheduleRender();
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'Bild konnte nicht geladen werden');
+  }
 }
 
 init();
